@@ -8,6 +8,7 @@ import (
 
 	"go-chat/backend/internal/database"
 	"go-chat/backend/internal/handlers"
+	"go-chat/backend/internal/auth"
 
 	"github.com/joho/godotenv"
 )
@@ -23,6 +24,11 @@ func main() {
 	}
 
 	databaseURL := os.Getenv("DATABASE_URL")
+	jwtSecret := os.Getenv("JWT_SECRET")
+
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET is not set")
+	}
 
 	db, err := database.Connect(databaseURL)
 	if err != nil {
@@ -33,13 +39,18 @@ func main() {
 	fmt.Println("Connected to PostgreSQL!")
 
 	userHandler := &handlers.UserHandler{
-		DB: db,
+		DB:        db,
+		JWTSecret: jwtSecret,
 	}
 
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/api/users", userHandler.GetUsers)
 	http.HandleFunc("/api/register", userHandler.Register)
 	http.HandleFunc("/api/login", userHandler.Login)
+	http.HandleFunc(
+		"/api/me",
+		auth.Middleware(jwtSecret, userHandler.Me),
+	)
 
 	port := os.Getenv("PORT")
 	fmt.Printf("Server running on http://localhost:%s\n", port)
