@@ -38,6 +38,8 @@ func main() {
 
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/api/users", userHandler.GetUsers)
+	http.HandleFunc("/api/register", userHandler.Register)
+	http.HandleFunc("/api/login", userHandler.Login)
 
 	port := os.Getenv("PORT")
 	fmt.Printf("Server running on http://localhost:%s\n", port)
