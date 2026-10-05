@@ -43,6 +43,10 @@ func main() {
 		JWTSecret: jwtSecret,
 	}
 
+	conversationHandler := &handlers.ConversationHandler{
+		DB: db,
+	}
+
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/api/users", userHandler.GetUsers)
 	http.HandleFunc("/api/register", userHandler.Register)
@@ -50,6 +54,10 @@ func main() {
 	http.HandleFunc(
 		"/api/me",
 		auth.Middleware(jwtSecret, userHandler.Me),
+	)
+	http.HandleFunc(
+		"/api/conversations",
+		auth.Middleware(jwtSecret, conversationHandler.Create),
 	)
 
 	port := os.Getenv("PORT")
