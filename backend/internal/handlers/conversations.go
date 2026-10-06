@@ -1,17 +1,18 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
-	"net/http"
 	"errors"
+	"net/http"
 	"strconv"
 
 	"go-chat/backend/internal/auth"
 	"go-chat/backend/internal/models"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type ConversationHandler struct {
@@ -32,8 +33,7 @@ func (h *ConversationHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	var req models.CreateConversationRequest
 
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -44,35 +44,15 @@ func (h *ConversationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.UserID == userID {
-		http.Error(w, "Cannot create a conversation with yourself", http.StatusBadRequest)
+		http.Error(
+			w,
+			"Cannot create a conversation with yourself",
+			http.StatusBadRequest,
+		)
 		return
 	}
 
-	firstID := userID
-	secondID := req.UserID
-
-	if firstID > secondID {
-		firstID, secondID = secondID, firstID
-	}
-
-	directKey := strconv.FormatInt(firstID, 10) +
-		":" +
-		strconv.FormatInt(secondID, 10)
-	
-	var exists bool
-
-	err = h.DB.QueryRow(
-		r.Context(),
-		`
-		SELECT EXISTS(
-			SELECT 1
-			FROM users
-			WHERE id = $1
-		)
-		`,
-		req.UserID,
-	).Scan(&exists)
-
+	exists, err := h.userExists(r.Context(), req.UserID)
 	if err != nil {
 		http.Error(w, "Failed to check user", http.StatusInternalServerError)
 		return
@@ -83,10 +63,68 @@ func (h *ConversationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var existing models.Conversation
+	directKey := makeDirectKey(userID, req.UserID)
 
-	err = h.DB.QueryRow(
+	conversation, created, err := h.getOrCreateDirectConversation(
 		r.Context(),
+		userID,
+		req.UserID,
+		directKey,
+	)
+
+	if err != nil {
+		http.Error(w, "Failed to create conversation", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if created {
+		w.WriteHeader(http.StatusCreated)
+	}
+
+	json.NewEncoder(w).Encode(conversation)
+}
+
+func (h *ConversationHandler) userExists(
+	ctx context.Context,
+	userID int64,
+) (bool, error) {
+	var exists bool
+
+	err := h.DB.QueryRow(
+		ctx,
+		`
+		SELECT EXISTS(
+			SELECT 1
+			FROM users
+			WHERE id = $1
+		)
+		`,
+		userID,
+	).Scan(&exists)
+
+	return exists, err
+}
+
+func makeDirectKey(userID1, userID2 int64) string {
+	if userID1 > userID2 {
+		userID1, userID2 = userID2, userID1
+	}
+
+	return strconv.FormatInt(userID1, 10) +
+		":" +
+		strconv.FormatInt(userID2, 10)
+}
+
+func (h *ConversationHandler) findDirectConversation(
+	ctx context.Context,
+	directKey string,
+) (*models.Conversation, error) {
+	var conversation models.Conversation
+
+	err := h.DB.QueryRow(
+		ctx,
 		`
 		SELECT id, type, created_at
 		FROM conversations
@@ -94,34 +132,35 @@ func (h *ConversationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		`,
 		directKey,
 	).Scan(
-		&existing.ID,
-		&existing.Type,
-		&existing.CreatedAt,
+		&conversation.ID,
+		&conversation.Type,
+		&conversation.CreatedAt,
 	)
 
-	if err == nil {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(existing)
-		return
-	}
-
-	if !errors.Is(err, pgx.ErrNoRows) {
-		http.Error(w, "Failed to check existing conversation", http.StatusInternalServerError)
-		return
-	}
-
-	tx, err := h.DB.Begin(r.Context())
 	if err != nil {
-		http.Error(w, "Failed to start transaction", http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 
-	defer tx.Rollback(r.Context())
+	return &conversation, nil
+}
+
+func (h *ConversationHandler) createDirectConversation(
+	ctx context.Context,
+	userID int64,
+	otherUserID int64,
+	directKey string,
+) (*models.Conversation, error) {
+	tx, err := h.DB.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer tx.Rollback(ctx)
 
 	var conversation models.Conversation
 
 	err = tx.QueryRow(
-		r.Context(),
+		ctx,
 		`
 		INSERT INTO conversations (type, direct_key)
 		VALUES ('direct', $1)
@@ -135,62 +174,69 @@ func (h *ConversationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
-		var pgErr *pgconn.PgError
-
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			tx.Rollback(r.Context())
-
-			err = h.DB.QueryRow(
-				r.Context(),
-				`
-				SELECT id, type, created_at
-				FROM conversations
-				WHERE direct_key = $1
-				`,
-				directKey,
-			).Scan(
-				&existing.ID,
-				&existing.Type,
-				&existing.CreatedAt,
-			)
-
-			if err != nil {
-				http.Error(w, "Failed to fetch conversation", http.StatusInternalServerError)
-				return
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(existing)
-			return
-		}
-
-		http.Error(w, "Failed to create conversation", http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 
 	_, err = tx.Exec(
-		r.Context(),
+		ctx,
 		`
 		INSERT INTO conversation_members (conversation_id, user_id)
 		VALUES ($1, $2), ($1, $3)
 		`,
 		conversation.ID,
 		userID,
-		req.UserID,
+		otherUserID,
 	)
 
 	if err != nil {
-		http.Error(w, "Failed to add conversation members", http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 
-	err = tx.Commit(r.Context())
-	if err != nil {
-		http.Error(w, "Failed to create conversation", http.StatusInternalServerError)
-		return
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(conversation)
+	return &conversation, nil
+}
+
+func (h *ConversationHandler) getOrCreateDirectConversation(
+	ctx context.Context,
+	userID int64,
+	otherUserID int64,
+	directKey string,
+) (*models.Conversation, bool, error) {
+	conversation, err := h.findDirectConversation(ctx, directKey)
+
+	if err == nil {
+		return conversation, false, nil
+	}
+
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, false, err
+	}
+
+	conversation, err = h.createDirectConversation(
+		ctx,
+		userID,
+		otherUserID,
+		directKey,
+	)
+
+	if err == nil {
+		return conversation, true, nil
+	}
+
+	var pgErr *pgconn.PgError
+
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		conversation, err = h.findDirectConversation(ctx, directKey)
+
+		if err != nil {
+			return nil, false, err
+		}
+
+		return conversation, false, nil
+	}
+
+	return nil, false, err
 }
