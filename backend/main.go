@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"os"
 
+	"go-chat/backend/internal/auth"
 	"go-chat/backend/internal/database"
 	"go-chat/backend/internal/handlers"
-	"go-chat/backend/internal/auth"
 
 	"github.com/joho/godotenv"
 )
@@ -47,6 +47,10 @@ func main() {
 		DB: db,
 	}
 
+	messageHandler := &handlers.MessageHandler{
+		DB: db,
+	}
+
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/api/users", userHandler.GetUsers)
 	http.HandleFunc("/api/register", userHandler.Register)
@@ -57,7 +61,15 @@ func main() {
 	)
 	http.HandleFunc(
 		"/api/conversations",
-		auth.Middleware(jwtSecret, conversationHandler.Create),
+		auth.Middleware(jwtSecret, conversationHandler.Handle),
+	)
+	http.HandleFunc(
+		"GET /api/conversations/{id}/messages",
+		auth.Middleware(jwtSecret, messageHandler.List),
+	)
+	http.HandleFunc(
+		"POST /api/conversations/{id}/messages",
+		auth.Middleware(jwtSecret, messageHandler.Create),
 	)
 
 	port := os.Getenv("PORT")

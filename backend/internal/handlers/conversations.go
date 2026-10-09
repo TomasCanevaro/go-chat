@@ -19,12 +19,20 @@ type ConversationHandler struct {
 	DB *pgxpool.Pool
 }
 
-func (h *ConversationHandler) Create(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
+func (h *ConversationHandler) Handle(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		h.List(w, r)
 
+	case http.MethodPost:
+		h.Create(w, r)
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (h *ConversationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.GetUserID(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -239,4 +247,71 @@ func (h *ConversationHandler) getOrCreateDirectConversation(
 	}
 
 	return nil, false, err
+}
+
+func (h *ConversationHandler) List(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.GetUserID(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	rows, err := h.DB.Query(
+		r.Context(),
+		`
+		SELECT
+			c.id,
+			c.type,
+			u.id,
+			u.username,
+			c.created_at
+		FROM conversations c
+		JOIN conversation_members my_membership
+			ON my_membership.conversation_id = c.id
+		JOIN conversation_members other_membership
+			ON other_membership.conversation_id = c.id
+			AND other_membership.user_id != $1
+		JOIN users u
+			ON u.id = other_membership.user_id
+		WHERE my_membership.user_id = $1
+			AND c.type = 'direct'
+		ORDER BY c.created_at DESC
+		`,
+		userID,
+	)
+
+	if err != nil {
+		http.Error(w, "Failed to fetch conversations", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	conversations := []models.ConversationListItem{}
+
+	for rows.Next() {
+		var conversation models.ConversationListItem
+
+		err := rows.Scan(
+			&conversation.ID,
+			&conversation.Type,
+			&conversation.OtherUserID,
+			&conversation.OtherUsername,
+			&conversation.CreatedAt,
+		)
+
+		if err != nil {
+			http.Error(w, "Failed to read conversation", http.StatusInternalServerError)
+			return
+		}
+
+		conversations = append(conversations, conversation)
+	}
+
+	if err := rows.Err(); err != nil {
+		http.Error(w, "Failed to read conversations", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(conversations)
 }

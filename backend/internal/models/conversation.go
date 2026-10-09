@@ -11,3 +11,11 @@ type Conversation struct {
 type CreateConversationRequest struct {
 	UserID int64 `json:"user_id"`
 }
+
+type ConversationListItem struct {
+	ID            int64     `json:"id"`
+	Type          string    `json:"type"`
+	OtherUserID   int64     `json:"other_user_id"`
+	OtherUsername string    `json:"other_username"`
+	CreatedAt     time.Time `json:"created_at"`
+}
