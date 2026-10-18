@@ -9,6 +9,7 @@ import (
 	"go-chat/backend/internal/auth"
 	"go-chat/backend/internal/database"
 	"go-chat/backend/internal/handlers"
+	"go-chat/backend/internal/websocket"
 
 	"github.com/joho/godotenv"
 )
@@ -71,6 +72,7 @@ func main() {
 		"POST /api/conversations/{id}/messages",
 		auth.Middleware(jwtSecret, messageHandler.Create),
 	)
+	http.HandleFunc("GET /ws", websocket.Handle)
 
 	port := os.Getenv("PORT")
 	fmt.Printf("Server running on http://localhost:%s\n", port)
