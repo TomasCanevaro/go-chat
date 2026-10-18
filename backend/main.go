@@ -52,6 +52,10 @@ func main() {
 		DB: db,
 	}
 
+	wsHandler := &websocket.Handler{
+		JWTSecret: jwtSecret,
+	}
+
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/api/users", userHandler.GetUsers)
 	http.HandleFunc("/api/register", userHandler.Register)
@@ -72,7 +76,7 @@ func main() {
 		"POST /api/conversations/{id}/messages",
 		auth.Middleware(jwtSecret, messageHandler.Create),
 	)
-	http.HandleFunc("GET /ws", websocket.Handle)
+	http.HandleFunc("GET /ws", wsHandler.Handle)
 
 	port := os.Getenv("PORT")
 	fmt.Printf("Server running on http://localhost:%s\n", port)
