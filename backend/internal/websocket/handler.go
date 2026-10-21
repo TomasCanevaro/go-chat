@@ -13,6 +13,7 @@ import (
 
 type Handler struct {
 	JWTSecret string
+	Hub       *Hub
 }
 
 type AuthMessage struct {
@@ -62,6 +63,14 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	client := &Client{
+		UserID: userID,
+		Conn:   conn,
+	}
+
+	h.Hub.Register(client)
+	defer h.Hub.Unregister(client)
+
 	// Authentication succeeded.
 	response := Response{
 		Type:    "auth_success",
@@ -76,9 +85,6 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 	if err := conn.Write(ctx, websocket.MessageText, responseData); err != nil {
 		return
 	}
-
-	// We will use userID when routing messages.
-	_ = userID
 
 	// Keep the connection open until the client disconnects.
 	for {

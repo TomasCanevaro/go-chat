@@ -52,8 +52,11 @@ func main() {
 		DB: db,
 	}
 
+	hub := websocket.NewHub()
+
 	wsHandler := &websocket.Handler{
 		JWTSecret: jwtSecret,
+		Hub:       hub,
 	}
 
 	http.HandleFunc("/", homeHandler)
