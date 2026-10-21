@@ -10,6 +10,7 @@ import (
 type Client struct {
 	UserID int64
 	Conn   *websocket.Conn
+	Send   chan []byte
 }
 
 type Hub struct {
@@ -67,4 +68,18 @@ func (h *Hub) ConnectionCount(userID int64) int {
 	defer h.mu.RUnlock()
 
 	return len(h.clients[userID])
+}
+
+func (h *Hub) SendToUser(userID int64, message []byte) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for client := range h.clients[userID] {
+		select {
+		case client.Send <- message:
+		default:
+			// The client isn't consuming messages fast enough.
+			// We'll handle slow-client disconnection later.
+		}
+	}
 }

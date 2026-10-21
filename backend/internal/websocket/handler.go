@@ -66,10 +66,8 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 	client := &Client{
 		UserID: userID,
 		Conn:   conn,
+		Send:   make(chan []byte, 16),
 	}
-
-	h.Hub.Register(client)
-	defer h.Hub.Unregister(client)
 
 	// Authentication succeeded.
 	response := Response{
@@ -85,6 +83,14 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 	if err := conn.Write(ctx, websocket.MessageText, responseData); err != nil {
 		return
 	}
+
+	writeCtx, cancelWrite := context.WithCancel(r.Context())
+	defer cancelWrite()
+
+	go client.WritePump(writeCtx)
+
+	h.Hub.Register(client)
+	defer h.Hub.Unregister(client)
 
 	// Keep the connection open until the client disconnects.
 	for {
