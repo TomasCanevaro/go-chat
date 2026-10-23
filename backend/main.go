@@ -48,11 +48,12 @@ func main() {
 		DB: db,
 	}
 
-	messageHandler := &handlers.MessageHandler{
-		DB: db,
-	}
-
 	hub := websocket.NewHub()
+
+	messageHandler := &handlers.MessageHandler{
+		DB:       db,
+		Notifier: hub,
+	}
 
 	wsHandler := &websocket.Handler{
 		JWTSecret: jwtSecret,

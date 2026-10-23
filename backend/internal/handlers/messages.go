@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,8 +16,13 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type MessageNotifier interface {
+	SendToUser(userID int64, message []byte)
+}
+
 type MessageHandler struct {
-	DB *pgxpool.Pool
+	DB       *pgxpool.Pool
+	Notifier MessageNotifier
 }
 
 func (h *MessageHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -199,7 +206,65 @@ func (h *MessageHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.Notifier != nil {
+		if err := h.notifyConversationMembers(r.Context(), message); err != nil {
+			log.Printf("Failed to notify conversation members: %v", err)
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(message)
+}
+
+func (h *MessageHandler) notifyConversationMembers(
+	ctx context.Context,
+	message models.Message,
+) error {
+	rows, err := h.DB.Query(
+		ctx,
+		`
+		SELECT user_id
+		FROM conversation_members
+		WHERE conversation_id = $1
+		`,
+		message.ConversationID,
+	)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var userIDs []int64
+
+	for rows.Next() {
+		var userID int64
+
+		if err := rows.Scan(&userID); err != nil {
+			return err
+		}
+
+		userIDs = append(userIDs, userID)
+	}
+
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	event, err := json.Marshal(struct {
+		Type    string         `json:"type"`
+		Message models.Message `json:"message"`
+	}{
+		Type:    "new_message",
+		Message: message,
+	})
+	if err != nil {
+		return err
+	}
+
+	for _, userID := range userIDs {
+		h.Notifier.SendToUser(userID, event)
+	}
+
+	return nil
 }
