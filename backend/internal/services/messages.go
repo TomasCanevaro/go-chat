@@ -35,19 +35,14 @@ func (s *MessageService) Create(
 	senderID int64,
 	content string,
 ) (*models.Message, error) {
-	content = strings.TrimSpace(content)
-
-	if content == "" {
-		return nil, ErrEmptyMessage
-	}
-
-	if utf8.RuneCountInString(content) > 4000 {
-		return nil, ErrMessageTooLong
+	content, err := ValidateMessageContent(content)
+	if err != nil {
+		return nil, err
 	}
 
 	var message models.Message
 
-	err := s.DB.QueryRow(
+	err = s.DB.QueryRow(
 		ctx,
 		`
 		WITH inserted AS (
@@ -100,6 +95,20 @@ func (s *MessageService) Create(
 	}
 
 	return &message, nil
+}
+
+func ValidateMessageContent(content string) (string, error) {
+	content = strings.TrimSpace(content)
+
+	if content == "" {
+		return "", ErrEmptyMessage
+	}
+
+	if utf8.RuneCountInString(content) > 4000 {
+		return "", ErrMessageTooLong
+	}
+
+	return content, nil
 }
 
 func (s *MessageService) notifyConversationMembers(
