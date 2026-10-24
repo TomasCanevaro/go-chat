@@ -3,22 +3,32 @@ package websocket
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"log"
 	"net/http"
 	"time"
 
 	"go-chat/backend/internal/auth"
+	"go-chat/backend/internal/services"
 
 	"github.com/coder/websocket"
 )
 
 type Handler struct {
-	JWTSecret string
-	Hub       *Hub
+	JWTSecret      string
+	Hub            *Hub
+	MessageService *services.MessageService
 }
 
 type AuthMessage struct {
 	Type  string `json:"type"`
 	Token string `json:"token"`
+}
+
+type SendMessageRequest struct {
+	Type           string `json:"type"`
+	ConversationID int64  `json:"conversation_id"`
+	Content        string `json:"content"`
 }
 
 type Response struct {
@@ -94,9 +104,85 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 
 	// Keep the connection open until the client disconnects.
 	for {
-		_, _, err := conn.Read(r.Context())
+		messageType, data, err := conn.Read(r.Context())
 		if err != nil {
 			return
 		}
+
+		if messageType != websocket.MessageText {
+			h.sendError(client, "Only text messages are supported")
+			continue
+		}
+
+		h.handleMessage(r.Context(), client, data)
+	}
+}
+
+func (h *Handler) handleMessage(
+	ctx context.Context,
+	client *Client,
+	data []byte,
+) {
+	var req SendMessageRequest
+
+	if err := json.Unmarshal(data, &req); err != nil {
+		h.sendError(client, "Invalid JSON")
+		return
+	}
+
+	switch req.Type {
+	case "send_message":
+		if req.ConversationID <= 0 {
+			h.sendError(client, "Invalid conversation ID")
+			return
+		}
+
+		_, err := h.MessageService.Create(
+			ctx,
+			req.ConversationID,
+			client.UserID,
+			req.Content,
+		)
+
+		if err != nil {
+			switch {
+			case errors.Is(err, services.ErrEmptyMessage):
+				h.sendError(client, "Message cannot be empty")
+
+			case errors.Is(err, services.ErrMessageTooLong):
+				h.sendError(client, "Message is too long")
+
+			case errors.Is(err, services.ErrConversationNotFound):
+				h.sendError(client, "Conversation not found")
+
+			default:
+				log.Printf("WebSocket message creation failed: %v", err)
+				h.sendError(client, "Failed to send message")
+			}
+			return
+		}
+
+		// MessageService already broadcasts the saved message
+		// to every conversation member through the hub.
+
+	default:
+		h.sendError(client, "Unknown message type")
+	}
+}
+
+func (h *Handler) sendError(client *Client, message string) {
+	response, err := json.Marshal(Response{
+		Type:    "error",
+		Message: message,
+	})
+
+	if err != nil {
+		return
+	}
+
+	select {
+	case client.Send <- response:
+	default:
+		log.Printf("WebSocket send queue full for user %d", client.UserID)
 	}
 }
