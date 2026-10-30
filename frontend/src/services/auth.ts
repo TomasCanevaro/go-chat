@@ -3,6 +3,7 @@ import type {
   LoginRequest,
   RegisterRequest,
 } from "../types/auth";
+import type { User } from "../types/auth";
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -42,4 +43,14 @@ export async function register(
   });
 
   return handleResponse<unknown>(response);
+}
+
+export async function getCurrentUser(token: string): Promise<User> {
+  const response = await fetch("/api/me", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return handleResponse<User>(response);
 }

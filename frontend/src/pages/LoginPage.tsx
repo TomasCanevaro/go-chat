@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 
-import { login } from "../services/auth";
+import { useAuth } from "../hooks/useAuth";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+
+  const { login } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,11 +21,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const response = await login({ email, password });
-
-      // Temporary authentication storage.
-      // We'll replace this with centralized auth state.
-      sessionStorage.setItem("token", response.token);
+      await login({ email, password });
 
       navigate("/");
     } catch (err) {
