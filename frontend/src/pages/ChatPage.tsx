@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { getConversations } from "../services/conversations";
 
 import ConversationSidebar from "../components/ConversationSidebar";
+import MessagePanel from "../components/MessagePanel";
 
 import type { Conversation } from "../types/conversation";
 
@@ -80,11 +81,11 @@ export default function ChatPage() {
           ) : error ? (
             <p role="alert">{error}</p>
           ) : selectedConversation ? (
-            <div>
-              <h2>{selectedConversation.other_username}</h2>
-              <p>Messages will appear here.</p>
-            </div>
-          ) : (
+              <MessagePanel
+                key={selectedConversation.id}
+                conversation={selectedConversation}
+              />
+            ) : (
             <div className="chat-placeholder">
               <h2>Welcome to Go Chat</h2>
               <p>Select a conversation to start chatting.</p>
