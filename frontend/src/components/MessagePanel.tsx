@@ -11,10 +11,12 @@ import type { Message } from "../types/message";
 
 interface MessagePanelProps {
   conversation: Conversation;
+  incomingMessages: Message[];
 }
 
 export default function MessagePanel({
   conversation,
+  incomingMessages,
 }: MessagePanelProps) {
   const { user, token } = useAuth();
 
@@ -23,6 +25,15 @@ export default function MessagePanel({
   const [error, setError] = useState("");
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  const visibleMessages = [
+    ...messages,
+    ...incomingMessages.filter(
+      (incoming) =>
+        incoming.conversation_id === conversation.id &&
+        !messages.some((message) => message.id === incoming.id)
+    ),
+  ].sort((a, b) => a.id - b.id);
 
   useEffect(() => {
     if (!token) return;
@@ -64,7 +75,7 @@ export default function MessagePanel({
         behavior: "smooth",
       });
     }
-  }, [messages, loading]);
+  }, [visibleMessages.length, loading]);
 
   async function handleSendMessage(content: string) {
     if (!token) {
@@ -77,7 +88,15 @@ export default function MessagePanel({
       content
     );
 
-    setMessages((previous) => [...previous, newMessage]);
+    setMessages((previous) => {
+      const exists = previous.some(
+        (message) => message.id === newMessage.id
+      );
+
+      if (exists) return previous;
+
+      return [...previous, newMessage];
+    });
   }
 
   return (
@@ -93,12 +112,12 @@ export default function MessagePanel({
           <p className="message-status" role="alert">
             {error}
           </p>
-        ) : messages.length === 0 ? (
+        ) : visibleMessages.length === 0 ? (
           <p className="message-status">
             No messages yet. Start the conversation!
           </p>
         ) : (
-          messages.map((message) => (
+          visibleMessages.map((message) => (
             <MessageBubble
               key={message.id}
               message={message}

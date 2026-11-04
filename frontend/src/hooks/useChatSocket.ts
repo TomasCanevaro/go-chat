@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { Message } from "../types/message";
 
 export type SocketStatus =
   | "disconnected"
@@ -6,13 +7,25 @@ export type SocketStatus =
   | "connected"
   | "error";
 
-export function useChatSocket(token: string | null) {
-  const [status, setStatus] = useState<SocketStatus>("disconnected");
+interface ChatSocketOptions {
+  token: string | null;
+  onNewMessage: (message: Message) => void;
+}
+
+export function useChatSocket({
+  token,
+  onNewMessage,
+}: ChatSocketOptions) {
+  const [status, setStatus] = useState<SocketStatus>(
+      token ? "connecting" : "disconnected"
+  );
 
   useEffect(() => {
     if (!token) return;
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const protocol =
+      window.location.protocol === "https:" ? "wss:" : "ws:";
+
     const url = `${protocol}//${window.location.host}/ws`;
 
     const socket = new WebSocket(url);
@@ -34,17 +47,23 @@ export function useChatSocket(token: string | null) {
       if (!active) return;
 
       try {
-        const data: unknown = JSON.parse(event.data);
+        const data = JSON.parse(event.data);
 
-        if (typeof data !== "object" || data === null || !("type" in data)) {
-          return;
-        }
+        switch (data.type) {
+          case "auth_success":
+            setStatus("connected");
+            break;
 
-        if (data.type === "auth_success") {
-          setStatus("connected");
-        } else if (data.type === "error") {
-          console.error("WebSocket error:", data);
-          setStatus("error");
+          case "new_message":
+            if (data.message) {
+              onNewMessage(data.message as Message);
+            }
+            break;
+
+          case "error":
+            console.error("WebSocket error:", data.message);
+            setStatus("error");
+            break;
         }
       } catch {
         console.error("Invalid WebSocket message");
@@ -63,7 +82,7 @@ export function useChatSocket(token: string | null) {
       active = false;
       socket.close();
     };
-  }, [token]);
+  }, [token, onNewMessage]);
 
   return { status };
 }

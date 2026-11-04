@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 import { useAuth } from "../hooks/useAuth";
 import { useChatSocket } from "../hooks/useChatSocket";
@@ -7,13 +7,29 @@ import { getConversations } from "../services/conversations";
 import ConversationSidebar from "../components/ConversationSidebar";
 import MessagePanel from "../components/MessagePanel";
 
+import type { Message } from "../types/message";
 import type { Conversation } from "../types/conversation";
 
 import "../styles/chat.css";
 
 export default function ChatPage() {
   const { user, token, logout } = useAuth();
-  const { status } = useChatSocket(token);
+  const [incomingMessages, setIncomingMessages] = useState<Message[]>([]);
+
+  const handleNewMessage = useCallback((message: Message) => {
+    setIncomingMessages((previous) => {
+      if (previous.some((item) => item.id === message.id)) {
+        return previous;
+      }
+
+      return [...previous, message];
+    });
+  }, []);
+
+  const { status } = useChatSocket({
+    token,
+    onNewMessage: handleNewMessage,
+  });
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] =
@@ -90,6 +106,7 @@ export default function ChatPage() {
               <MessagePanel
                 key={selectedConversation.id}
                 conversation={selectedConversation}
+                incomingMessages={incomingMessages}
               />
             ) : (
             <div className="chat-placeholder">
