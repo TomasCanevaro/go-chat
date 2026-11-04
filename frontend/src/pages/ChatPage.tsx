@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { useAuth } from "../hooks/useAuth";
+import { useChatSocket } from "../hooks/useChatSocket";
 import { getConversations } from "../services/conversations";
 
 import ConversationSidebar from "../components/ConversationSidebar";
@@ -12,6 +13,7 @@ import "../styles/chat.css";
 
 export default function ChatPage() {
   const { user, token, logout } = useAuth();
+  const { status } = useChatSocket(token);
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] =
@@ -61,6 +63,10 @@ export default function ChatPage() {
 
         <div className="chat-user">
           <span>{user?.username}</span>
+
+          <span className="connection-status">
+            Chat connection: {status}
+          </span>
 
           <button onClick={logout} className="logout-button">
             Logout
