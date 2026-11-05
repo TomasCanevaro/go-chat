@@ -2,13 +2,14 @@ import { useEffect, useState, useCallback } from "react";
 
 import { useAuth } from "../hooks/useAuth";
 import { useChatSocket } from "../hooks/useChatSocket";
-import { getConversations } from "../services/conversations";
+import { createConversation, getConversations } from "../services/conversations";
 
 import ConversationSidebar from "../components/ConversationSidebar";
 import MessagePanel from "../components/MessagePanel";
 
 import type { Message } from "../types/message";
 import type { Conversation } from "../types/conversation";
+import type { User } from "../types/auth";
 
 import "../styles/chat.css";
 
@@ -72,6 +73,26 @@ export default function ChatPage() {
     };
   }, [token]);
 
+  async function handleStartConversation(otherUser: User) {
+    if (!token) {
+      throw new Error("Please log in to start a conversation");
+    }
+
+    const result = await createConversation(token, otherUser.id);
+    const conversation: Conversation = {
+      ...result,
+      other_username: otherUser.username,
+    };
+
+    setConversations((previous) => {
+      if (previous.some((item) => item.id === conversation.id)) {
+        return previous;
+      }
+      return [conversation, ...previous];
+    });
+    setSelectedConversation(conversation);
+  }
+
   return (
     <div className="chat-app">
       <header className="chat-header">
@@ -95,6 +116,8 @@ export default function ChatPage() {
           conversations={conversations}
           selectedConversationId={selectedConversation?.id ?? null}
           onSelectConversation={setSelectedConversation}
+          onStartConversation={handleStartConversation}
+          loading={loading}
         />
 
         <main className="chat-panel">

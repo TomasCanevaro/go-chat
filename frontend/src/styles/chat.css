@@ -62,6 +62,25 @@
   font-size: 1.1rem;
 }
 
+.new-conversation-picker {
+  padding: 0 20px 16px;
+}
+
+.new-conversation-button {
+  margin-top: 12px;
+}
+
+.new-conversation-picker .conversation-list {
+  margin-top: 12px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.new-conversation-picker button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .conversation-list {
   list-style: none;
   padding: 0;
