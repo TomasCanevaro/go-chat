@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router";
 
 import { register } from "../services/auth";
 
+import "../styles/auth.css";
+
 export default function RegisterPage() {
   const navigate = useNavigate();
 
@@ -33,54 +35,80 @@ export default function RegisterPage() {
   }
 
   return (
-    <main>
-      <h1>Create an account</h1>
+    <main className="auth-page">
+      <section className="auth-card" aria-labelledby="register-title">
+        <header className="auth-header">
+          <p className="auth-brand">Go Chat</p>
+          <h1 id="register-title">Create an account</h1>
+          <p className="auth-description">Join Go Chat and start a conversation.</p>
+        </header>
 
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="username">Username</label>
-          <input
-            id="username"
-            type="text"
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            required
-          />
-        </div>
+        <form className="auth-form" onSubmit={handleSubmit} aria-busy={loading}>
+          <div className="auth-field">
+            <label htmlFor="username">Username</label>
+            <input
+              id="username"
+              name="username"
+              type="text"
+              autoComplete="username"
+              placeholder="Choose a username"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              disabled={loading}
+              aria-describedby={error ? "register-error" : undefined}
+              required
+            />
+          </div>
 
-        <div>
-          <label htmlFor="email">Email</label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
-        </div>
+          <div className="auth-field">
+            <label htmlFor="email">Email</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              disabled={loading}
+              aria-describedby={error ? "register-error" : undefined}
+              required
+            />
+          </div>
 
-        <div>
-          <label htmlFor="password">Password</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            minLength={8}
-            required
-          />
-        </div>
+          <div className="auth-field">
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="new-password"
+              placeholder="Create a password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              disabled={loading}
+              aria-describedby={error ? "password-hint register-error" : "password-hint"}
+              minLength={8}
+              required
+            />
+            <p className="auth-hint" id="password-hint">Use at least 8 characters.</p>
+          </div>
 
-        {error && <p role="alert">{error}</p>}
+          {error && (
+            <p className="auth-error" id="register-error" role="alert">
+              {error}
+            </p>
+          )}
 
-        <button type="submit" disabled={loading}>
-          {loading ? "Creating account..." : "Register"}
-        </button>
-      </form>
+          <button className="auth-submit" type="submit" disabled={loading}>
+            {loading ? "Creating account..." : "Register"}
+          </button>
+        </form>
 
-      <p>
-        Already have an account? <Link to="/login">Login</Link>
-      </p>
+        <p className="auth-footer">
+          Already have an account? <Link to="/login">Login</Link>
+        </p>
+      </section>
     </main>
   );
 }
