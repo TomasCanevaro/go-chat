@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Message } from "../types/message";
 
 export type SocketStatus =
@@ -17,8 +17,10 @@ export function useChatSocket({
   onNewMessage,
 }: ChatSocketOptions) {
   const [status, setStatus] = useState<SocketStatus>(
-      token ? "connecting" : "disconnected"
+    token ? "connecting" : "disconnected"
   );
+
+  const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -29,6 +31,7 @@ export function useChatSocket({
     const url = `${protocol}//${window.location.host}/ws`;
 
     const socket = new WebSocket(url);
+    socketRef.current = socket;
 
     let active = true;
 
@@ -80,9 +83,29 @@ export function useChatSocket({
 
     return () => {
       active = false;
+      socketRef.current = null;
       socket.close();
     };
   }, [token, onNewMessage]);
 
-  return { status };
+  const sendMessage = useCallback(
+    (conversationId: number, content: string) => {
+      const socket = socketRef.current;
+
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        throw new Error("WebSocket is not connected");
+      }
+
+      socket.send(
+        JSON.stringify({
+          type: "send_message",
+          conversation_id: conversationId,
+          content,
+        })
+      );
+    },
+    []
+  );
+
+  return { status, sendMessage };
 }

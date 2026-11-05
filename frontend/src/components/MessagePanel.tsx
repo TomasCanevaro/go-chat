@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { useAuth } from "../hooks/useAuth";
-import { getMessages, sendMessage } from "../services/messages";
+import { getMessages } from "../services/messages";
 
 import MessageBubble from "./MessageBubble";
 import MessageInput from "./MessageInput";
@@ -12,11 +12,15 @@ import type { Message } from "../types/message";
 interface MessagePanelProps {
   conversation: Conversation;
   incomingMessages: Message[];
+  onSendMessage: (conversationId: number, content: string) => void;
+  socketConnected: boolean;
 }
 
 export default function MessagePanel({
   conversation,
   incomingMessages,
+  onSendMessage,
+  socketConnected,
 }: MessagePanelProps) {
   const { user, token } = useAuth();
 
@@ -78,25 +82,11 @@ export default function MessagePanel({
   }, [visibleMessages.length, loading]);
 
   async function handleSendMessage(content: string) {
-    if (!token) {
-      throw new Error("You are not authenticated");
+    if (!socketConnected) {
+      throw new Error("Chat connection is unavailable");
     }
 
-    const newMessage = await sendMessage(
-      token,
-      conversation.id,
-      content
-    );
-
-    setMessages((previous) => {
-      const exists = previous.some(
-        (message) => message.id === newMessage.id
-      );
-
-      if (exists) return previous;
-
-      return [...previous, newMessage];
-    });
+    onSendMessage(conversation.id, content);
   }
 
   return (
@@ -131,7 +121,7 @@ export default function MessagePanel({
 
       <MessageInput
         onSendMessage={handleSendMessage}
-        disabled={loading || Boolean(error)}
+        disabled={loading || Boolean(error) || !socketConnected}
       />
     </section>
   );

@@ -26,7 +26,7 @@ export default function ChatPage() {
     });
   }, []);
 
-  const { status } = useChatSocket({
+  const { status, sendMessage } = useChatSocket({
     token,
     onNewMessage: handleNewMessage,
   });
@@ -107,6 +107,8 @@ export default function ChatPage() {
                 key={selectedConversation.id}
                 conversation={selectedConversation}
                 incomingMessages={incomingMessages}
+                onSendMessage={sendMessage}
+                socketConnected={status === "connected"}
               />
             ) : (
             <div className="chat-placeholder">
