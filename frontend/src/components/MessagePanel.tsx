@@ -12,7 +12,7 @@ import type { Message } from "../types/message";
 interface MessagePanelProps {
   conversation: Conversation;
   incomingMessages: Message[];
-  onSendMessage: (conversationId: number, content: string) => void;
+  onSendMessage: (conversationId: number, content: string) => Promise<void>;
   socketConnected: boolean;
 }
 
@@ -86,7 +86,7 @@ export default function MessagePanel({
       throw new Error("Chat connection is unavailable");
     }
 
-    onSendMessage(conversation.id, content);
+    await onSendMessage(conversation.id, content);
   }
 
   return (
