@@ -27,6 +27,7 @@ export default function MessagePanel({
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [retryAttempt, setRetryAttempt] = useState(0);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -40,7 +41,7 @@ export default function MessagePanel({
   ].sort((a, b) => a.id - b.id);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || !socketConnected) return;
 
     let cancelled = false;
 
@@ -49,14 +50,22 @@ export default function MessagePanel({
         const data = await getMessages(token!, conversation.id);
 
         if (!cancelled) {
-          setMessages(data ?? []);
+          // Keep messages already loaded while merging the refreshed history.
+          setMessages((previous) => {
+            const byId = new Map(previous.map((message) => [message.id, message]));
+            for (const message of data ?? []) {
+              byId.set(message.id, message);
+            }
+            return [...byId.values()];
+          });
+          setError("");
         }
       } catch (err) {
         if (!cancelled) {
           setError(
             err instanceof Error
               ? err.message
-              : "Failed to load messages"
+              : "Failed to synchronize messages"
           );
         }
       } finally {
@@ -71,7 +80,7 @@ export default function MessagePanel({
     return () => {
       cancelled = true;
     };
-  }, [conversation.id, token]);
+  }, [conversation.id, token, socketConnected, retryAttempt]);
 
   useEffect(() => {
     if (!loading) {
@@ -96,16 +105,30 @@ export default function MessagePanel({
       </header>
 
       <div className="message-list">
-        {loading ? (
-          <p className="message-status">Loading messages...</p>
-        ) : error ? (
-          <p className="message-status" role="alert">
-            {error}
+        {error && (
+          <div role="alert">
+            <p>Could not synchronize messages: {error}</p>
+            <button
+              type="button"
+              className="logout-button"
+              disabled={!socketConnected}
+              onClick={() => setRetryAttempt((previous) => previous + 1)}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {loading && visibleMessages.length === 0 ? (
+          <p className="message-status">
+            {socketConnected ? "Loading messages..." : "Waiting for chat connection..."}
           </p>
         ) : visibleMessages.length === 0 ? (
-          <p className="message-status">
-            No messages yet. Start the conversation!
-          </p>
+          !error && (
+            <p className="message-status">
+              No messages yet. Start the conversation!
+            </p>
+          )
         ) : (
           visibleMessages.map((message) => (
             <MessageBubble
@@ -121,7 +144,7 @@ export default function MessagePanel({
 
       <MessageInput
         onSendMessage={handleSendMessage}
-        disabled={loading || Boolean(error) || !socketConnected}
+        disabled={loading || !socketConnected}
       />
     </section>
   );
