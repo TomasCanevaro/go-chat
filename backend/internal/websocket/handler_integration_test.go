@@ -3,13 +3,13 @@ package websocket
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
 	"time"
-	"fmt"
 
 	"go-chat/backend/internal/auth"
 	"go-chat/backend/internal/services"
@@ -262,92 +262,179 @@ func createWebSocketTestFixture(
 }
 
 func TestWebSocketMessageDelivery(t *testing.T) {
-	db := setupWebSocketTestDB(t)
+	for _, clientID := range []string{"", "delivery-1"} {
+		t.Run("client_id="+clientID, func(t *testing.T) {
+			db := setupWebSocketTestDB(t)
 
-	fixture := createWebSocketTestFixture(t, db)
+			fixture := createWebSocketTestFixture(t, db)
 
-	secret := "websocket-test-secret"
+			secret := "websocket-test-secret"
 
-	server := setupWebSocketTestServer(t, db, secret)
+			server := setupWebSocketTestServer(t, db, secret)
 
-	alice := connectAuthenticatedClient(t, server, fixture.AliceID, secret)
-	bob := connectAuthenticatedClient(t, server, fixture.BobID, secret)
+			alice := connectAuthenticatedClient(t, server, fixture.AliceID, secret)
+			bob := connectAuthenticatedClient(t, server, fixture.BobID, secret)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
 
-	// Alice sends a message through WebSocket.
-	request := map[string]interface{}{
-		"type":            "send_message",
-		"conversation_id": fixture.ConversationID,
-		"content":         "Hello Bob, this is an automated test!",
-	}
+			// Alice sends a message through WebSocket.
+			request := map[string]interface{}{
+				"type":            "send_message",
+				"client_id":       clientID,
+				"conversation_id": fixture.ConversationID,
+				"content":         "Hello Bob, this is an automated test!",
+			}
 
-	data, err := json.Marshal(request)
-	if err != nil {
-		t.Fatalf("Failed to marshal message: %v", err)
-	}
+			data, err := json.Marshal(request)
+			if err != nil {
+				t.Fatalf("Failed to marshal message: %v", err)
+			}
 
-	if err := alice.Write(ctx, websocket.MessageText, data); err != nil {
-		t.Fatalf("Failed to send message: %v", err)
-	}
+			if err := alice.Write(ctx, websocket.MessageText, data); err != nil {
+				t.Fatalf("Failed to send message: %v", err)
+			}
 
-	// Bob should receive the new_message event.
-	_, response, err := bob.Read(ctx)
-	if err != nil {
-		t.Fatalf("Bob did not receive message: %v", err)
-	}
+			// Bob should receive the new_message event.
+			_, response, err := bob.Read(ctx)
+			if err != nil {
+				t.Fatalf("Bob did not receive message: %v", err)
+			}
 
-	var event struct {
-		Type    string `json:"type"`
-		Message struct {
-			ID             int64  `json:"id"`
-			ConversationID int64  `json:"conversation_id"`
-			SenderID       int64  `json:"sender_id"`
-			Content        string `json:"content"`
-		} `json:"message"`
-	}
+			var event struct {
+				Type    string `json:"type"`
+				Message struct {
+					ID             int64  `json:"id"`
+					ConversationID int64  `json:"conversation_id"`
+					SenderID       int64  `json:"sender_id"`
+					Content        string `json:"content"`
+				} `json:"message"`
+			}
 
-	if err := json.Unmarshal(response, &event); err != nil {
-		t.Fatalf("Failed to decode event: %v", err)
-	}
+			if err := json.Unmarshal(response, &event); err != nil {
+				t.Fatalf("Failed to decode event: %v", err)
+			}
 
-	if event.Type != "new_message" {
-		t.Fatalf("Expected new_message, got %s", event.Type)
-	}
+			if event.Type != "new_message" {
+				t.Fatalf("Expected new_message, got %s", event.Type)
+			}
 
-	if event.Message.Content != "Hello Bob, this is an automated test!" {
-		t.Errorf("Unexpected content: %s", event.Message.Content)
-	}
+			if event.Message.Content != "Hello Bob, this is an automated test!" {
+				t.Errorf("Unexpected content: %s", event.Message.Content)
+			}
 
-	if event.Message.SenderID != fixture.AliceID {
-		t.Errorf("Expected sender ID %d, got %d",
-			fixture.AliceID,
-			event.Message.SenderID,
-		)
-	}
+			if event.Message.SenderID != fixture.AliceID {
+				t.Errorf("Expected sender ID %d, got %d",
+					fixture.AliceID,
+					event.Message.SenderID,
+				)
+			}
 
-	if event.Message.ConversationID != fixture.ConversationID {
-		t.Errorf("Expected conversation ID %d, got %d",
-			fixture.ConversationID,
-			event.Message.ConversationID,
-		)
-	}
+			if event.Message.ConversationID != fixture.ConversationID {
+				t.Errorf("Expected conversation ID %d, got %d",
+					fixture.ConversationID,
+					event.Message.ConversationID,
+				)
+			}
 
-	// Verify PostgreSQL persistence.
-	var savedContent string
+			// Verify PostgreSQL persistence.
+			var savedContent string
 
-	err = db.QueryRow(ctx, `
+			err = db.QueryRow(ctx, `
 		SELECT content
 		FROM messages
 		WHERE id = $1
 	`, event.Message.ID).Scan(&savedContent)
 
-	if err != nil {
-		t.Fatalf("Failed to retrieve saved message: %v", err)
+			if err != nil {
+				t.Fatalf("Failed to retrieve saved message: %v", err)
+			}
+
+			if savedContent != event.Message.Content {
+				t.Errorf("Persisted content does not match WebSocket event")
+			}
+			// The sender receives the broadcast and, for correlated requests, an ack.
+			expectedEvents := 1
+			if clientID != "" {
+				expectedEvents = 2
+			}
+			seen := make(map[string]bool)
+			for i := 0; i < expectedEvents; i++ {
+				_, data, err := alice.Read(ctx)
+				if err != nil {
+					t.Fatalf("Read sender event: %v", err)
+				}
+				var senderEvent struct {
+					Type      string `json:"type"`
+					ClientID  string `json:"client_id"`
+					MessageID int64  `json:"message_id"`
+					Message   struct {
+						ID int64 `json:"id"`
+					} `json:"message"`
+				}
+				if err := json.Unmarshal(data, &senderEvent); err != nil {
+					t.Fatal(err)
+				}
+				if seen[senderEvent.Type] {
+					t.Fatalf("Duplicate event: %s", senderEvent.Type)
+				}
+				seen[senderEvent.Type] = true
+				switch senderEvent.Type {
+				case "new_message":
+					if senderEvent.Message.ID != event.Message.ID {
+						t.Fatal("Sender broadcast ID mismatch")
+					}
+				case "message_ack":
+					if clientID == "" || senderEvent.ClientID != clientID || senderEvent.MessageID != event.Message.ID {
+						t.Fatalf("Unexpected ack: %+v", senderEvent)
+					}
+				default:
+					t.Fatalf("Unexpected sender event: %s", senderEvent.Type)
+				}
+			}
+			if !seen["new_message"] || (clientID != "" && !seen["message_ack"]) {
+				t.Fatal("Missing sender event")
+			}
+		})
 	}
 
-	if savedContent != event.Message.Content {
-		t.Errorf("Persisted content does not match WebSocket event")
+}
+
+func TestWebSocketMessageMembershipError(t *testing.T) {
+	db := setupWebSocketTestDB(t)
+	fixture := createWebSocketTestFixture(t, db)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	// Bob exists but is no longer a member of this conversation.
+	if _, err := db.Exec(ctx, "DELETE FROM conversation_members WHERE conversation_id = $1 AND user_id = $2", fixture.ConversationID, fixture.BobID); err != nil {
+		t.Fatal(err)
+	}
+	secret := "websocket-test-secret"
+	server := setupWebSocketTestServer(t, db, secret)
+	bob := connectAuthenticatedClient(t, server, fixture.BobID, secret)
+	data, err := json.Marshal(SendMessageRequest{Type: "send_message", ClientID: "rejected-1", ConversationID: fixture.ConversationID, Content: "Not allowed"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := bob.Write(ctx, websocket.MessageText, data); err != nil {
+		t.Fatal(err)
+	}
+	_, data, err = bob.Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var response Response
+	if err := json.Unmarshal(data, &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Type != "message_error" || response.ClientID != "rejected-1" || response.Message != "Conversation not found" || response.MessageID != 0 {
+		t.Fatalf("Unexpected response: %+v", response)
+	}
+	var count int
+	if err := db.QueryRow(ctx, "SELECT count(*) FROM messages WHERE conversation_id = $1", fixture.ConversationID).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatal("Rejected message was persisted")
 	}
 }

@@ -27,13 +27,16 @@ type AuthMessage struct {
 
 type SendMessageRequest struct {
 	Type           string `json:"type"`
+	ClientID       string `json:"client_id"`
 	ConversationID int64  `json:"conversation_id"`
 	Content        string `json:"content"`
 }
 
 type Response struct {
-	Type    string `json:"type"`
-	Message string `json:"message"`
+	Type      string `json:"type"`
+	ClientID  string `json:"client_id,omitempty"`
+	MessageID int64  `json:"message_id,omitempty"`
+	Message   string `json:"message,omitempty"`
 }
 
 func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
@@ -133,11 +136,11 @@ func (h *Handler) handleMessage(
 	switch req.Type {
 	case "send_message":
 		if req.ConversationID <= 0 {
-			h.sendError(client, "Invalid conversation ID")
+			h.sendMessageError(client, req.ClientID, "Invalid conversation ID")
 			return
 		}
 
-		_, err := h.MessageService.Create(
+		message, err := h.MessageService.Create(
 			ctx,
 			req.ConversationID,
 			client.UserID,
@@ -147,17 +150,17 @@ func (h *Handler) handleMessage(
 		if err != nil {
 			switch {
 			case errors.Is(err, services.ErrEmptyMessage):
-				h.sendError(client, "Message cannot be empty")
+				h.sendMessageError(client, req.ClientID, "Message cannot be empty")
 
 			case errors.Is(err, services.ErrMessageTooLong):
-				h.sendError(client, "Message is too long")
+				h.sendMessageError(client, req.ClientID, "Message is too long")
 
 			case errors.Is(err, services.ErrConversationNotFound):
-				h.sendError(client, "Conversation not found")
+				h.sendMessageError(client, req.ClientID, "Conversation not found")
 
 			default:
 				log.Printf("WebSocket message creation failed: %v", err)
-				h.sendError(client, "Failed to send message")
+				h.sendMessageError(client, req.ClientID, "Failed to send message")
 			}
 			return
 		}
@@ -165,16 +168,37 @@ func (h *Handler) handleMessage(
 		// MessageService already broadcasts the saved message
 		// to every conversation member through the hub.
 
+		if req.ClientID != "" {
+			h.sendResponse(client, Response{
+				Type:      "message_ack",
+				ClientID:  req.ClientID,
+				MessageID: message.ID,
+			})
+		}
+
 	default:
 		h.sendError(client, "Unknown message type")
 	}
 }
 
 func (h *Handler) sendError(client *Client, message string) {
-	response, err := json.Marshal(Response{
-		Type:    "error",
-		Message: message,
+	h.sendResponse(client, Response{Type: "error", Message: message})
+}
+
+func (h *Handler) sendMessageError(client *Client, clientID, message string) {
+	if clientID == "" {
+		h.sendError(client, message)
+		return
+	}
+	h.sendResponse(client, Response{
+		Type:     "message_error",
+		ClientID: clientID,
+		Message:  message,
 	})
+}
+
+func (h *Handler) sendResponse(client *Client, event Response) {
+	response, err := json.Marshal(event)
 
 	if err != nil {
 		return
