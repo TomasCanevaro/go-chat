@@ -35,6 +35,7 @@ export default function ChatPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] =
     useState<Conversation | null>(null);
+  const [showConversationList, setShowConversationList] = useState(true);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -73,6 +74,11 @@ export default function ChatPage() {
     };
   }, [token]);
 
+  function handleSelectConversation(conversation: Conversation) {
+    setSelectedConversation(conversation);
+    setShowConversationList(false);
+  }
+
   async function handleStartConversation(otherUser: User) {
     if (!token) {
       throw new Error("Please log in to start a conversation");
@@ -90,7 +96,7 @@ export default function ChatPage() {
       }
       return [conversation, ...previous];
     });
-    setSelectedConversation(conversation);
+    handleSelectConversation(conversation);
   }
 
   return (
@@ -111,11 +117,11 @@ export default function ChatPage() {
         </div>
       </header>
 
-      <div className="chat-layout">
+      <div className={`chat-layout${selectedConversation && !showConversationList ? " chat-layout--conversation-open" : ""}`}>
         <ConversationSidebar
           conversations={conversations}
           selectedConversationId={selectedConversation?.id ?? null}
-          onSelectConversation={setSelectedConversation}
+          onSelectConversation={handleSelectConversation}
           onStartConversation={handleStartConversation}
           loading={loading}
         />
@@ -132,6 +138,7 @@ export default function ChatPage() {
                 incomingMessages={incomingMessages}
                 onSendMessage={sendMessage}
                 socketConnected={status === "connected"}
+                onBack={() => setShowConversationList(true)}
               />
             ) : (
             <div className="chat-placeholder">

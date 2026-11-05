@@ -14,6 +14,7 @@ interface MessagePanelProps {
   incomingMessages: Message[];
   onSendMessage: (conversationId: number, content: string) => Promise<void>;
   socketConnected: boolean;
+  onBack: () => void;
 }
 
 export default function MessagePanel({
@@ -21,6 +22,7 @@ export default function MessagePanel({
   incomingMessages,
   onSendMessage,
   socketConnected,
+  onBack,
 }: MessagePanelProps) {
   const { user, token } = useAuth();
 
@@ -101,6 +103,13 @@ export default function MessagePanel({
   return (
     <section className="message-panel">
       <header className="message-panel-header">
+        <button
+          type="button"
+          className="logout-button conversation-back-button"
+          onClick={onBack}
+        >
+          Back to conversations
+        </button>
         <h2>{conversation.other_username}</h2>
       </header>
 

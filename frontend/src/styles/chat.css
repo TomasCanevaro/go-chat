@@ -7,6 +7,7 @@
 }
 
 .chat-header {
+  flex-shrink: 0;
   height: 72px;
   padding: 0 24px;
   display: flex;
@@ -48,6 +49,9 @@
 }
 
 .conversation-sidebar {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
   background-color: #1e293b;
   border-right: 1px solid #334155;
   padding: 20px 0;
@@ -110,6 +114,7 @@
 }
 
 .conversation-avatar {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -121,6 +126,8 @@
 }
 
 .conversation-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-weight: 500;
 }
 
@@ -146,6 +153,7 @@
 }
 
 .message-panel-header {
+  flex-shrink: 0;
   padding: 20px 24px;
   border-bottom: 1px solid #334155;
 }
@@ -153,6 +161,11 @@
 .message-panel-header h2 {
   margin: 0;
   font-size: 1.1rem;
+  overflow-wrap: anywhere;
+}
+
+.conversation-back-button {
+  display: none;
 }
 
 .message-list {
@@ -219,24 +232,10 @@
   }
 }
 
-@media (max-width: 600px) {
-  .chat-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .conversation-sidebar {
-    border-right: none;
-    border-bottom: 1px solid #334155;
-  }
-
-  .chat-panel {
-    min-height: 300px;
-  }
-}
-
 /* Message input */
 
 .message-input-form {
+  flex-shrink: 0;
   padding: 16px 24px;
   border-top: 1px solid #334155;
   background-color: #111827;
@@ -309,4 +308,64 @@
 .connection-status {
   color: #94a3b8;
   font-size: 0.85rem;
+}
+
+@media (max-width: 600px) {
+  .chat-header {
+    height: auto;
+    min-height: 72px;
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .chat-user {
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+
+  .chat-user > span {
+    overflow-wrap: anywhere;
+  }
+
+  .chat-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .conversation-sidebar {
+    border-right: none;
+  }
+
+  .chat-panel {
+    display: none;
+  }
+
+  .chat-layout--conversation-open .conversation-sidebar {
+    display: none;
+  }
+
+  .chat-layout--conversation-open .chat-panel {
+    display: flex;
+  }
+
+  .conversation-back-button {
+    display: inline-flex;
+    margin-bottom: 12px;
+  }
+
+  .message-panel-header,
+  .message-list,
+  .message-input-form {
+    padding: 12px 16px;
+  }
+
+  .message-input-form {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  .message-bubble {
+    max-width: 90%;
+  }
 }
