@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router";
 
 import { useAuth } from "../hooks/useAuth";
 
+import "../styles/auth.css";
+
 export default function LoginPage() {
   const navigate = useNavigate();
 
@@ -34,42 +36,62 @@ export default function LoginPage() {
   }
 
   return (
-    <main>
-      <h1>Login</h1>
+    <main className="auth-page">
+      <section className="auth-card" aria-labelledby="login-title">
+        <header className="auth-header">
+          <p className="auth-brand">Go Chat</p>
+          <h1 id="login-title">Welcome back</h1>
+          <p className="auth-description">Log in to continue your conversations.</p>
+        </header>
 
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="email">Email</label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
-        </div>
+        <form className="auth-form" onSubmit={handleSubmit} aria-busy={loading}>
+          <div className="auth-field">
+            <label htmlFor="email">Email</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="username"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              disabled={loading}
+              aria-describedby={error ? "login-error" : undefined}
+              required
+            />
+          </div>
 
-        <div>
-          <label htmlFor="password">Password</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-          />
-        </div>
+          <div className="auth-field">
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              placeholder="Enter your password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              disabled={loading}
+              aria-describedby={error ? "login-error" : undefined}
+              required
+            />
+          </div>
 
-        {error && <p role="alert">{error}</p>}
+          {error && (
+            <p className="auth-error" id="login-error" role="alert">
+              {error}
+            </p>
+          )}
 
-        <button type="submit" disabled={loading}>
-          {loading ? "Logging in..." : "Login"}
-        </button>
-      </form>
+          <button className="auth-submit" type="submit" disabled={loading}>
+            {loading ? "Logging in..." : "Login"}
+          </button>
+        </form>
 
-      <p>
-        Don't have an account? <Link to="/register">Register</Link>
-      </p>
+        <p className="auth-footer">
+          Don't have an account? <Link to="/register">Register</Link>
+        </p>
+      </section>
     </main>
   );
 }
