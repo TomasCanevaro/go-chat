@@ -47,7 +47,7 @@ export default function ConversationSidebar({
       </div>
 
       {error && (
-        <div className="sidebar-header" role="alert">
+        <div className="chat-feedback sidebar-feedback" role="alert">
           <p>Could not refresh conversations: {error}</p>
           <button type="button" className="logout-button" onClick={onRetry}>
             Retry
@@ -62,11 +62,13 @@ export default function ConversationSidebar({
         />
       )}
 
-      {conversations.length === 0 ? (
+      {loading ? (
+        <p className="empty-conversations" role="status">Loading conversations...</p>
+      ) : conversations.length === 0 && !error ? (
         <p className="empty-conversations">
           You don't have any conversations yet.
         </p>
-      ) : (
+      ) : conversations.length > 0 ? (
         <ul className="conversation-list">
           {conversations.map((conversation) => (
             <li key={conversation.id}>
@@ -89,7 +91,7 @@ export default function ConversationSidebar({
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
     </aside>
   );
 }

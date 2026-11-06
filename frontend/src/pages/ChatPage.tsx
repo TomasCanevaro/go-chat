@@ -145,7 +145,7 @@ export default function ChatPage() {
 
         <main className="chat-panel">
           {loading ? (
-            <p>Loading conversations...</p>
+            <p className="message-status" role="status">Loading conversations...</p>
           ) : selectedConversation ? (
               <MessagePanel
                 key={selectedConversation.id}

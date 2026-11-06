@@ -115,7 +115,7 @@ export default function MessagePanel({
 
       <div className="message-list">
         {error && (
-          <div role="alert">
+          <div className="chat-feedback" role="alert">
             <p>Could not synchronize messages: {error}</p>
             <button
               type="button"

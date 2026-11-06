@@ -84,7 +84,7 @@ export default function NewConversationPicker({
       {loading ? (
         <p role="status">Loading users...</p>
       ) : loadError ? (
-        <div role="alert">
+        <div className="chat-feedback" role="alert">
           <p>Could not load users: {loadError}</p>
           <button
             type="button"
@@ -119,7 +119,7 @@ export default function NewConversationPicker({
         </ul>
       )}
 
-      {selectionError && <p role="alert">{selectionError}</p>}
+      {selectionError && <p className="chat-feedback" role="alert">{selectionError}</p>}
     </section>
   );
 }
