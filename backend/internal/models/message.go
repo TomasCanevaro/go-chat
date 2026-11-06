@@ -14,3 +14,9 @@ type Message struct {
 type CreateMessageRequest struct {
 	Content string `json:"content"`
 }
+
+// MessagePage contains messages in ascending ID order, ready for display.
+type MessagePage struct {
+	Messages []Message `json:"messages"`
+	HasMore  bool      `json:"has_more"`
+}

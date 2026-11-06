@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
 
 	"go-chat/backend/internal/auth"
@@ -38,6 +39,27 @@ func (h *MessageHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Pagination is opt-in until the frontend adopts the page response.
+	query := r.URL.Query()
+	paginated := query.Has("limit") || query.Has("before_id")
+	limit := 30
+	if query.Has("limit") {
+		limit, err = strconv.Atoi(query.Get("limit"))
+		if err != nil || limit < 1 || limit > 100 {
+			http.Error(w, "Limit must be between 1 and 100", http.StatusBadRequest)
+			return
+		}
+	}
+	var beforeID *int64
+	if query.Has("before_id") {
+		id, err := strconv.ParseInt(query.Get("before_id"), 10, 64)
+		if err != nil || id <= 0 {
+			http.Error(w, "Invalid before_id", http.StatusBadRequest)
+			return
+		}
+		beforeID = &id
+	}
+
 	var isMember bool
 
 	err = h.DB.QueryRow(
@@ -64,23 +86,21 @@ func (h *MessageHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := h.DB.Query(
-		r.Context(),
-		`
-		SELECT
-			m.id,
-			m.conversation_id,
-			m.sender_id,
-			u.username,
-			m.content,
-			m.created_at
-		FROM messages m
-		JOIN users u ON u.id = m.sender_id
-		WHERE m.conversation_id = $1
-		ORDER BY m.created_at ASC, m.id ASC
-		`,
-		conversationID,
-	)
+	sql := `
+        SELECT m.id, m.conversation_id, m.sender_id, u.username, m.content, m.created_at
+        FROM messages m
+        JOIN users u ON u.id = m.sender_id
+        WHERE m.conversation_id = $1
+    `
+	args := []any{conversationID}
+	if paginated {
+		// Fetch one extra row to determine whether an older page exists.
+		sql += ` AND ($2::bigint IS NULL OR m.id < $2) ORDER BY m.id DESC LIMIT $3`
+		args = append(args, beforeID, limit+1)
+	} else {
+		sql += ` ORDER BY m.created_at ASC, m.id ASC`
+	}
+	rows, err := h.DB.Query(r.Context(), sql, args...)
 
 	if err != nil {
 		http.Error(w, "Failed to fetch messages", http.StatusInternalServerError)
@@ -115,6 +135,15 @@ func (h *MessageHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	if paginated {
+		hasMore := len(messages) > limit
+		if hasMore {
+			messages = messages[:limit]
+		}
+		slices.Reverse(messages)
+		json.NewEncoder(w).Encode(models.MessagePage{Messages: messages, HasMore: hasMore})
+		return
+	}
 	json.NewEncoder(w).Encode(messages)
 }
 
