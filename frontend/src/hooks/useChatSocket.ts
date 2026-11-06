@@ -46,7 +46,7 @@ export function useChatSocket({
       for (const pending of pendingMessages.values()) {
         clearTimeout(pending.timer);
         pending.reject(new Error(
-          "Connection closed before confirmation. Your message may have been saved; check the conversation before retrying."
+          "Connection closed before confirmation. Reconnect and retry without editing the draft to avoid a duplicate."
         ));
       }
       pendingMessages.clear();
@@ -187,7 +187,7 @@ export function useChatSocket({
   }, [token, onNewMessage, onConversationsChanged]);
 
   const sendMessage = useCallback(
-    async (conversationId: number, content: string): Promise<void> => {
+    async (conversationId: number, content: string, clientId: string): Promise<void> => {
       const socket = socketRef.current;
 
       if (
@@ -198,14 +198,13 @@ export function useChatSocket({
         throw new Error("Chat connection is unavailable");
       }
 
-      const clientId = crypto.randomUUID();
       const pendingMessages = pendingMessagesRef.current;
 
       return new Promise<void>((resolve, reject) => {
         const timer = setTimeout(() => {
           pendingMessages.delete(clientId);
           reject(new Error(
-            "No confirmation received. Your message may have been saved; check the conversation before retrying."
+            "No confirmation received. Retry without editing the draft to avoid sending a duplicate."
           ));
         }, ACK_TIMEOUT);
 

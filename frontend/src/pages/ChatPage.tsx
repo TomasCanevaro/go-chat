@@ -15,11 +15,12 @@ import "../styles/chat.css";
 
 interface ComposerState {
   content: string;
+  clientId: string | null;
   sending: boolean;
   error: string;
 }
 
-const EMPTY_COMPOSER: ComposerState = { content: "", sending: false, error: "" };
+const EMPTY_COMPOSER: ComposerState = { content: "", clientId: null, sending: false, error: "" };
 
 export default function ChatPage() {
   const { user, token, logout } = useAuth();
@@ -64,9 +65,10 @@ export default function ChatPage() {
     if (pendingSends.current.has(conversationId)) return;
 
     pendingSends.current.add(conversationId);
-    updateComposer(conversationId, { sending: true, error: "" });
     try {
-      await sendMessage(conversationId, content.trim());
+      const clientId = composers[conversationId]?.clientId ?? crypto.randomUUID();
+      updateComposer(conversationId, { sending: true, error: "", clientId });
+      await sendMessage(conversationId, content.trim(), clientId);
       setComposers((previous) => {
         const current = previous[conversationId] ?? EMPTY_COMPOSER;
         return {
@@ -75,6 +77,7 @@ export default function ChatPage() {
             ...current,
             // An acknowledgment belongs only to the draft that was submitted.
             content: current.content === content ? "" : current.content,
+            clientId: current.clientId === clientId ? null : current.clientId,
             sending: false,
           },
         };
@@ -205,7 +208,7 @@ export default function ChatPage() {
                 draft={composer.content}
                 sending={composer.sending}
                 sendError={composer.error}
-                onDraftChange={(content) => updateComposer(selectedConversation.id, { content })}
+                onDraftChange={(content) => updateComposer(selectedConversation.id, { content, clientId: null, error: "" })}
                 socketConnected={status === "connected"}
                 onBack={() => setShowConversationList(true)}
               />
