@@ -1,4 +1,4 @@
-import { type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
 
 interface MessageInputProps {
   content: string;
@@ -17,6 +17,23 @@ export default function MessageInput({
   onSendMessage,
   disabled = false,
 }: MessageInputProps) {
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const restoreFocus = useRef(false);
+
+  useEffect(() => {
+    if (sending || disabled || !restoreFocus.current) return;
+    restoreFocus.current = false;
+
+    const input = inputRef.current;
+    const focused = document.activeElement;
+    // Restore focus after clicking Send, but leave deliberate navigation alone.
+    if (input && input.getClientRects().length > 0 &&
+        (focused === document.body || focused === input ||
+         focused === input.form?.querySelector('button[type="submit"]'))) {
+      input.focus({ preventScroll: true });
+    }
+  }, [sending, disabled]);
+
   const isEmpty = content.trim().length === 0;
   const isTooLong = Array.from(content).length > 4000;
 
@@ -27,6 +44,7 @@ export default function MessageInput({
       return;
     }
 
+    restoreFocus.current = true;
     await onSendMessage(content);
   }
 
@@ -38,15 +56,17 @@ export default function MessageInput({
   }
 
   return (
-    <form className="message-input-form" onSubmit={handleSubmit}>
+    <form className="message-input-form" onSubmit={handleSubmit} aria-busy={sending}>
       <div className="message-input-container">
         <textarea
+          ref={inputRef}
           className="message-input"
           placeholder="Type a message..."
           value={content}
           onChange={(event) => onContentChange(event.target.value)}
           onKeyDown={handleKeyDown}
-          disabled={disabled || sending}
+          disabled={disabled}
+          readOnly={sending}
           rows={1}
           aria-label="Message"
         />
