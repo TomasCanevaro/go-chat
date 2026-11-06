@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 import { useAuth } from "../hooks/useAuth";
 import { useChatSocket } from "../hooks/useChatSocket";
@@ -12,6 +12,14 @@ import type { Conversation } from "../types/conversation";
 import type { User } from "../types/auth";
 
 import "../styles/chat.css";
+
+interface ComposerState {
+  content: string;
+  sending: boolean;
+  error: string;
+}
+
+const EMPTY_COMPOSER: ComposerState = { content: "", sending: false, error: "" };
 
 export default function ChatPage() {
   const { user, token, logout } = useAuth();
@@ -42,6 +50,48 @@ export default function ChatPage() {
   const [selectedConversation, setSelectedConversation] =
     useState<Conversation | null>(null);
   const [showConversationList, setShowConversationList] = useState(true);
+  const [composers, setComposers] = useState<Record<number, ComposerState>>({});
+  const pendingSends = useRef(new Set<number>());
+
+  function updateComposer(conversationId: number, changes: Partial<ComposerState>) {
+    setComposers((previous) => ({
+      ...previous,
+      [conversationId]: { ...(previous[conversationId] ?? EMPTY_COMPOSER), ...changes },
+    }));
+  }
+
+  async function handleSendMessage(conversationId: number, content: string) {
+    if (pendingSends.current.has(conversationId)) return;
+
+    pendingSends.current.add(conversationId);
+    updateComposer(conversationId, { sending: true, error: "" });
+    try {
+      await sendMessage(conversationId, content.trim());
+      setComposers((previous) => {
+        const current = previous[conversationId] ?? EMPTY_COMPOSER;
+        return {
+          ...previous,
+          [conversationId]: {
+            ...current,
+            // An acknowledgment belongs only to the draft that was submitted.
+            content: current.content === content ? "" : current.content,
+            sending: false,
+          },
+        };
+      });
+    } catch (err) {
+      updateComposer(conversationId, {
+        sending: false,
+        error: err instanceof Error ? err.message : "Failed to send message",
+      });
+    } finally {
+      pendingSends.current.delete(conversationId);
+    }
+  }
+
+  const composer = selectedConversation
+    ? composers[selectedConversation.id] ?? EMPTY_COMPOSER
+    : EMPTY_COMPOSER;
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -151,7 +201,11 @@ export default function ChatPage() {
                 key={selectedConversation.id}
                 conversation={selectedConversation}
                 incomingMessages={incomingMessages}
-                onSendMessage={sendMessage}
+                onSendMessage={handleSendMessage}
+                draft={composer.content}
+                sending={composer.sending}
+                sendError={composer.error}
+                onDraftChange={(content) => updateComposer(selectedConversation.id, { content })}
                 socketConnected={status === "connected"}
                 onBack={() => setShowConversationList(true)}
               />

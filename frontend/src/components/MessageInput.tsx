@@ -1,18 +1,22 @@
-import { useState, type FormEvent, type KeyboardEvent } from "react";
+import { type FormEvent, type KeyboardEvent } from "react";
 
 interface MessageInputProps {
+  content: string;
+  sending: boolean;
+  error: string;
+  onContentChange: (content: string) => void;
   onSendMessage: (content: string) => Promise<void>;
   disabled?: boolean;
 }
 
 export default function MessageInput({
+  content,
+  sending,
+  error,
+  onContentChange,
   onSendMessage,
   disabled = false,
 }: MessageInputProps) {
-  const [content, setContent] = useState("");
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState("");
-
   const isEmpty = content.trim().length === 0;
   const isTooLong = Array.from(content).length > 4000;
 
@@ -23,19 +27,7 @@ export default function MessageInput({
       return;
     }
 
-    setSending(true);
-    setError("");
-
-    try {
-      await onSendMessage(content.trim());
-      setContent("");
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to send message"
-      );
-    } finally {
-      setSending(false);
-    }
+    await onSendMessage(content);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -52,7 +44,7 @@ export default function MessageInput({
           className="message-input"
           placeholder="Type a message..."
           value={content}
-          onChange={(event) => setContent(event.target.value)}
+          onChange={(event) => onContentChange(event.target.value)}
           onKeyDown={handleKeyDown}
           disabled={disabled || sending}
           rows={1}

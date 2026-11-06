@@ -13,6 +13,10 @@ interface MessagePanelProps {
   conversation: Conversation;
   incomingMessages: Message[];
   onSendMessage: (conversationId: number, content: string) => Promise<void>;
+  draft: string;
+  sending: boolean;
+  sendError: string;
+  onDraftChange: (content: string) => void;
   socketConnected: boolean;
   onBack: () => void;
 }
@@ -21,6 +25,10 @@ export default function MessagePanel({
   conversation,
   incomingMessages,
   onSendMessage,
+  draft,
+  sending,
+  sendError,
+  onDraftChange,
   socketConnected,
   onBack,
 }: MessagePanelProps) {
@@ -92,14 +100,6 @@ export default function MessagePanel({
     }
   }, [visibleMessages.length, loading]);
 
-  async function handleSendMessage(content: string) {
-    if (!socketConnected) {
-      throw new Error("Chat connection is unavailable");
-    }
-
-    await onSendMessage(conversation.id, content);
-  }
-
   return (
     <section className="message-panel">
       <header className="message-panel-header">
@@ -152,7 +152,11 @@ export default function MessagePanel({
       </div>
 
       <MessageInput
-        onSendMessage={handleSendMessage}
+        content={draft}
+        sending={sending}
+        error={sendError}
+        onContentChange={onDraftChange}
+        onSendMessage={(content) => onSendMessage(conversation.id, content)}
         disabled={loading || !socketConnected}
       />
     </section>
