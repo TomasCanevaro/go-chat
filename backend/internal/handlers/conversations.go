@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -15,8 +16,13 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type ConversationNotifier interface {
+	SendToUser(userID int64, message []byte)
+}
+
 type ConversationHandler struct {
-	DB *pgxpool.Pool
+	DB       *pgxpool.Pool
+	Notifier ConversationNotifier
 }
 
 func (h *ConversationHandler) Handle(w http.ResponseWriter, r *http.Request) {
@@ -83,6 +89,21 @@ func (h *ConversationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "Failed to create conversation", http.StatusInternalServerError)
 		return
+	}
+
+	// The transaction has committed. Notification is best-effort and does not
+	// change the successful creation response.
+	if created && h.Notifier != nil {
+		event, err := json.Marshal(struct {
+			Type           string `json:"type"`
+			ConversationID int64  `json:"conversation_id"`
+		}{Type: "conversation_created", ConversationID: conversation.ID})
+		if err != nil {
+			log.Printf("Failed to encode conversation notification: %v", err)
+		} else {
+			h.Notifier.SendToUser(userID, event)
+			h.Notifier.SendToUser(req.UserID, event)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

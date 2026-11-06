@@ -27,9 +27,15 @@ export default function ChatPage() {
     });
   }, []);
 
+  const [conversationRefresh, setConversationRefresh] = useState(0);
+  const refreshConversations = useCallback(() => {
+    setConversationRefresh((previous) => previous + 1);
+  }, []);
+
   const { status, sendMessage } = useChatSocket({
     token,
     onNewMessage: handleNewMessage,
+    onConversationsChanged: refreshConversations,
   });
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -50,7 +56,16 @@ export default function ChatPage() {
         const data = await getConversations(token!);
 
         if (!cancelled) {
-          setConversations(data ?? []);
+          // Preserve locally created items if a list request started before creation.
+          setConversations((previous) => {
+            const fetched = data ?? [];
+            const fetchedIds = new Set(fetched.map((conversation) => conversation.id));
+            return [
+              ...previous.filter((conversation) => !fetchedIds.has(conversation.id)),
+              ...fetched,
+            ];
+          });
+          setError("");
         }
       } catch (err) {
         if (!cancelled) {
@@ -72,7 +87,7 @@ export default function ChatPage() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, conversationRefresh]);
 
   function handleSelectConversation(conversation: Conversation) {
     setSelectedConversation(conversation);
@@ -124,13 +139,13 @@ export default function ChatPage() {
           onSelectConversation={handleSelectConversation}
           onStartConversation={handleStartConversation}
           loading={loading}
+          error={error}
+          onRetry={refreshConversations}
         />
 
         <main className="chat-panel">
           {loading ? (
             <p>Loading conversations...</p>
-          ) : error ? (
-            <p role="alert">{error}</p>
           ) : selectedConversation ? (
               <MessagePanel
                 key={selectedConversation.id}

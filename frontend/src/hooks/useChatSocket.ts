@@ -10,6 +10,7 @@ export type SocketStatus =
 interface ChatSocketOptions {
   token: string | null;
   onNewMessage: (message: Message) => void;
+  onConversationsChanged: () => void;
 }
 
 interface PendingMessage {
@@ -25,6 +26,7 @@ const INITIAL_RECONNECT_DELAY = 1000;
 export function useChatSocket({
   token,
   onNewMessage,
+  onConversationsChanged,
 }: ChatSocketOptions) {
   const [status, setStatus] = useState<SocketStatus>(
     token ? "connecting" : "disconnected"
@@ -89,6 +91,13 @@ export function useChatSocket({
               authenticatedRef.current = true;
               reconnectAttempts = 0;
               setStatus("connected");
+              onConversationsChanged();
+              break;
+
+            case "conversation_created":
+              if (Number.isSafeInteger(data.conversation_id) && data.conversation_id > 0) {
+                onConversationsChanged();
+              }
               break;
 
             case "new_message":
@@ -175,7 +184,7 @@ export function useChatSocket({
       socketRef.current?.close();
       socketRef.current = null;
     };
-  }, [token, onNewMessage]);
+  }, [token, onNewMessage, onConversationsChanged]);
 
   const sendMessage = useCallback(
     async (conversationId: number, content: string): Promise<void> => {

@@ -10,6 +10,8 @@ interface ConversationSidebarProps {
   onSelectConversation: (conversation: Conversation) => void;
   onStartConversation: (user: User) => Promise<void>;
   loading: boolean;
+  error: string;
+  onRetry: () => void;
 }
 
 export default function ConversationSidebar({
@@ -18,6 +20,8 @@ export default function ConversationSidebar({
   onSelectConversation,
   onStartConversation,
   loading,
+  error,
+  onRetry,
 }: ConversationSidebarProps) {
   const [showPicker, setShowPicker] = useState(false);
 
@@ -41,6 +45,15 @@ export default function ConversationSidebar({
           </button>
         )}
       </div>
+
+      {error && (
+        <div className="sidebar-header" role="alert">
+          <p>Could not refresh conversations: {error}</p>
+          <button type="button" className="logout-button" onClick={onRetry}>
+            Retry
+          </button>
+        </div>
+      )}
 
       {showPicker && (
         <NewConversationPicker

@@ -45,11 +45,12 @@ func main() {
 		JWTSecret: jwtSecret,
 	}
 
-	conversationHandler := &handlers.ConversationHandler{
-		DB: db,
-	}
-
 	hub := websocket.NewHub()
+
+	conversationHandler := &handlers.ConversationHandler{
+		DB:       db,
+		Notifier: hub,
+	}
 
 	messageService := &services.MessageService{
 		DB:       db,
