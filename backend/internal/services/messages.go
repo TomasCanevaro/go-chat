@@ -15,6 +15,8 @@ import (
 )
 
 var (
+	ErrClientIDConflict     = errors.New("client ID already used for another message")
+	ErrInvalidClientID      = errors.New("client ID must contain 1 to 128 bytes")
 	ErrEmptyMessage         = errors.New("message cannot be empty")
 	ErrMessageTooLong       = errors.New("message is too long")
 	ErrConversationNotFound = errors.New("conversation not found")
@@ -35,6 +37,19 @@ func (s *MessageService) Create(
 	senderID int64,
 	content string,
 ) (*models.Message, error) {
+	return s.CreateWithClientID(ctx, conversationID, senderID, content, "")
+}
+
+// CreateWithClientID persists a send once per sender/client ID. Empty IDs keep
+// legacy behavior. A repeated send returns its original message without rebroadcasting.
+func (s *MessageService) CreateWithClientID(
+	ctx context.Context,
+	conversationID, senderID int64,
+	content, clientID string,
+) (*models.Message, error) {
+	if len(clientID) > 128 || (clientID != "" && strings.TrimSpace(clientID) == "") {
+		return nil, ErrInvalidClientID
+	}
 	content, err := ValidateMessageContent(content)
 	if err != nil {
 		return nil, err
@@ -46,14 +61,15 @@ func (s *MessageService) Create(
 		ctx,
 		`
 		WITH inserted AS (
-			INSERT INTO messages (conversation_id, sender_id, content)
-			SELECT $1, $2, $3
+			INSERT INTO messages (conversation_id, sender_id, content, client_id)
+			SELECT $1, $2, $3, NULLIF($4, '')
 			WHERE EXISTS (
 				SELECT 1
 				FROM conversation_members
 				WHERE conversation_id = $1
 				  AND user_id = $2
 			)
+			ON CONFLICT (sender_id, client_id) DO NOTHING
 			RETURNING id, conversation_id, sender_id, content, created_at
 		)
 		SELECT
@@ -69,6 +85,7 @@ func (s *MessageService) Create(
 		conversationID,
 		senderID,
 		content,
+		clientID,
 	).Scan(
 		&message.ID,
 		&message.ConversationID,
@@ -78,6 +95,28 @@ func (s *MessageService) Create(
 		&message.CreatedAt,
 	)
 
+	if errors.Is(err, pgx.ErrNoRows) && clientID != "" {
+		// ON CONFLICT waits for a concurrent insert to finish. This separate query
+		// sees that committed row and rechecks membership before returning it.
+		err = s.DB.QueryRow(ctx, `
+            SELECT m.id, m.conversation_id, m.sender_id, u.username, m.content, m.created_at
+            FROM messages m JOIN users u ON u.id = m.sender_id
+            WHERE m.sender_id = $1 AND m.client_id = $2
+              AND EXISTS (
+                SELECT 1 FROM conversation_members
+                WHERE conversation_id = $3 AND user_id = $1
+              )
+        `, senderID, clientID, conversationID).Scan(
+			&message.ID, &message.ConversationID, &message.SenderID,
+			&message.SenderUsername, &message.Content, &message.CreatedAt,
+		)
+		if err == nil {
+			if message.ConversationID != conversationID || message.Content != content {
+				return nil, ErrClientIDConflict
+			}
+			return &message, nil
+		}
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrConversationNotFound
 	}

@@ -438,3 +438,45 @@ func TestWebSocketMessageMembershipError(t *testing.T) {
 		t.Fatal("Rejected message was persisted")
 	}
 }
+
+func TestWebSocketRetriedMessageAcknowledgment(t *testing.T) {
+	db := setupWebSocketTestDB(t)
+	fixture := createWebSocketTestFixture(t, db)
+	handler := &Handler{MessageService: &services.MessageService{DB: db}}
+	client := newTestClient(fixture.AliceID)
+	send := func(content string) Response {
+		t.Helper()
+		data, err := json.Marshal(SendMessageRequest{Type: "send_message", ClientID: "retry-ack", ConversationID: fixture.ConversationID, Content: content})
+		if err != nil {
+			t.Fatal(err)
+		}
+		handler.handleMessage(context.Background(), client, data)
+		select {
+		case data := <-client.Send:
+			var response Response
+			if err := json.Unmarshal(data, &response); err != nil {
+				t.Fatal(err)
+			}
+			return response
+		default:
+			t.Fatal("Missing send response")
+			return Response{}
+		}
+	}
+	first := send("Hello")
+	retry := send("Hello")
+	if first.Type != "message_ack" || retry.Type != "message_ack" || first.MessageID <= 0 || first.MessageID != retry.MessageID || retry.ClientID != "retry-ack" {
+		t.Fatalf("Unexpected acknowledgments: %+v / %+v", first, retry)
+	}
+	conflict := send("Different text")
+	if conflict.Type != "message_error" || conflict.ClientID != "retry-ack" || conflict.Message != "Client ID already used for another message" {
+		t.Fatalf("Unexpected conflict response: %+v", conflict)
+	}
+	var count int
+	if err := db.QueryRow(context.Background(), "SELECT count(*) FROM messages WHERE conversation_id=$1", fixture.ConversationID).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("Expected one saved message, got %d", count)
+	}
+}

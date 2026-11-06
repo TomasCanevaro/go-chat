@@ -140,15 +140,20 @@ func (h *Handler) handleMessage(
 			return
 		}
 
-		message, err := h.MessageService.Create(
+		message, err := h.MessageService.CreateWithClientID(
 			ctx,
 			req.ConversationID,
 			client.UserID,
 			req.Content,
+			req.ClientID,
 		)
 
 		if err != nil {
 			switch {
+			case errors.Is(err, services.ErrClientIDConflict):
+				h.sendMessageError(client, req.ClientID, "Client ID already used for another message")
+			case errors.Is(err, services.ErrInvalidClientID):
+				h.sendMessageError(client, req.ClientID, "Client ID must contain 1 to 128 bytes")
 			case errors.Is(err, services.ErrEmptyMessage):
 				h.sendMessageError(client, req.ClientID, "Message cannot be empty")
 
@@ -165,8 +170,8 @@ func (h *Handler) handleMessage(
 			return
 		}
 
-		// MessageService already broadcasts the saved message
-		// to every conversation member through the hub.
+		// MessageService broadcasts newly saved messages through the hub.
+		// Identical retries only receive the acknowledgment below.
 
 		if req.ClientID != "" {
 			h.sendResponse(client, Response{

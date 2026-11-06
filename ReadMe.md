@@ -50,7 +50,8 @@ psql -h localhost -U chatuser -d chatdb -v ON_ERROR_STOP=1 --single-transaction 
   -f backend/migrations/001_create_users.sql \
   -f backend/migrations/002_create_chat_tables.sql \
   -f backend/migrations/003_add_conversation_type.sql \
-  -f backend/migrations/004_add_direct_key.sql
+  -f backend/migrations/004_add_direct_key.sql \
+  -f backend/migrations/005_add_message_client_id.sql
 ```
 
 Run these migrations once on a fresh database; the backend does not apply them automatically.
@@ -122,7 +123,8 @@ psql -h localhost -U chatuser -d chatdb_test -v ON_ERROR_STOP=1 --single-transac
   -f backend/migrations/001_create_users.sql \
   -f backend/migrations/002_create_chat_tables.sql \
   -f backend/migrations/003_add_conversation_type.sql \
-  -f backend/migrations/004_add_direct_key.sql
+  -f backend/migrations/004_add_direct_key.sql \
+  -f backend/migrations/005_add_message_client_id.sql
 ```
 
 Add this to `backend/.env`, using the same password as above:
