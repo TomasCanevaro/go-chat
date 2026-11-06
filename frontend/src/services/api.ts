@@ -1,3 +1,5 @@
+import { handleResponse } from "./response";
+
 export async function apiRequest<T>(
   endpoint: string,
   token: string,
@@ -16,13 +18,5 @@ export async function apiRequest<T>(
     headers,
   });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => null);
-
-    throw new Error(
-      error?.error || error?.message || `Request failed (${response.status})`
-    );
-  }
-
-  return response.json() as Promise<T>;
+  return handleResponse<T>(response);
 }

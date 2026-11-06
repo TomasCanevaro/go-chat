@@ -4,18 +4,7 @@ import type {
   RegisterRequest,
 } from "../types/auth";
 import type { User } from "../types/auth";
-
-async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const error = await response.json().catch(() => null);
-
-    throw new Error(
-      error?.error || error?.message || "Something went wrong"
-    );
-  }
-
-  return response.json() as Promise<T>;
-}
+import { handleResponse } from "./response";
 
 export async function login(
   credentials: LoginRequest
