@@ -16,6 +16,7 @@ export default function MessageBubble({
 
   return (
     <div
+      data-message-id={message.id}
       className={`message-row ${isOwnMessage ? "own" : "other"}`}
     >
       <div className="message-bubble">

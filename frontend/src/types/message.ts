@@ -6,3 +6,8 @@ export interface Message {
   content: string;
   created_at: string;
 }
+
+export interface MessagePage {
+  messages: Message[];
+  has_more: boolean;
+}

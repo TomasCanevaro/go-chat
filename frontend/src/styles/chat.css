@@ -226,6 +226,11 @@
   overflow-y: auto;
 }
 
+.message-history-controls {
+  flex-shrink: 0;
+  text-align: center;
+}
+
 .message-row {
   display: flex;
   width: 100%;
