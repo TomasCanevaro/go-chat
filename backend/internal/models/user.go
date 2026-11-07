@@ -9,6 +9,12 @@ type User struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// UserSummary is the public identity needed to start a conversation.
+type UserSummary struct {
+	ID       int64  `json:"id"`
+	Username string `json:"username"`
+}
+
 type RegisterRequest struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`

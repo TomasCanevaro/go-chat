@@ -2,13 +2,13 @@ import { useState } from "react";
 
 import NewConversationPicker from "./NewConversationPicker";
 import type { Conversation } from "../types/conversation";
-import type { User } from "../types/auth";
+import type { UserSummary } from "../types/auth";
 
 interface ConversationSidebarProps {
   conversations: Conversation[];
   selectedConversationId: number | null;
   onSelectConversation: (conversation: Conversation) => void;
-  onStartConversation: (user: User) => Promise<void>;
+  onStartConversation: (user: UserSummary) => Promise<void>;
   loading: boolean;
   error: string;
   onRetry: () => void;
@@ -25,7 +25,7 @@ export default function ConversationSidebar({
 }: ConversationSidebarProps) {
   const [showPicker, setShowPicker] = useState(false);
 
-  async function handleSelectUser(user: User) {
+  async function handleSelectUser(user: UserSummary) {
     await onStartConversation(user);
     setShowPicker(false);
   }

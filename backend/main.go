@@ -69,7 +69,7 @@ func main() {
 	}
 
 	http.HandleFunc("/", homeHandler)
-	http.HandleFunc("/api/users", userHandler.GetUsers)
+	http.HandleFunc("/api/users", auth.Middleware(jwtSecret, userHandler.GetUsers))
 	http.HandleFunc("/api/register", userHandler.Register)
 	http.HandleFunc("/api/login", userHandler.Login)
 	http.HandleFunc(

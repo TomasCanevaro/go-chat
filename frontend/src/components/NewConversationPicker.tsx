@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "../hooks/useAuth";
 import { getUsers } from "../services/users";
-import type { User } from "../types/auth";
+import type { UserSummary } from "../types/auth";
 
 interface NewConversationPickerProps {
-  onSelectUser: (user: User) => Promise<void>;
+  onSelectUser: (user: UserSummary) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -14,7 +14,7 @@ export default function NewConversationPicker({
   onCancel,
 }: NewConversationPickerProps) {
   const { token, user } = useAuth();
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [selectionError, setSelectionError] = useState("");
@@ -49,7 +49,7 @@ export default function NewConversationPicker({
     };
   }, [token, retryAttempt]);
 
-  async function handleSelectUser(selectedUser: User) {
+  async function handleSelectUser(selectedUser: UserSummary) {
     if (selectingUserId !== null) return;
 
     setSelectingUserId(selectedUser.id);

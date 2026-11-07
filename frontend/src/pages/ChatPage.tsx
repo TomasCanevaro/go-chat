@@ -9,7 +9,7 @@ import MessagePanel from "../components/MessagePanel";
 
 import type { Message } from "../types/message";
 import type { Conversation } from "../types/conversation";
-import type { User } from "../types/auth";
+import type { UserSummary } from "../types/auth";
 
 import "../styles/chat.css";
 
@@ -147,7 +147,7 @@ export default function ChatPage() {
     setShowConversationList(false);
   }
 
-  async function handleStartConversation(otherUser: User) {
+  async function handleStartConversation(otherUser: UserSummary) {
     if (!token) {
       throw new Error("Please log in to start a conversation");
     }

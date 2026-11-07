@@ -1,6 +1,6 @@
 import { apiRequest } from "./api";
-import type { User } from "../types/auth";
+import type { UserSummary } from "../types/auth";
 
-export async function getUsers(token: string): Promise<User[]> {
-  return apiRequest<User[]>("/api/users", token);
+export async function getUsers(token: string): Promise<UserSummary[]> {
+  return apiRequest<UserSummary[]>("/api/users", token);
 }

@@ -1,6 +1,9 @@
-export interface User {
+export interface UserSummary {
   id: number;
   username: string;
+}
+
+export interface User extends UserSummary {
   email: string;
   created_at?: string;
 }

@@ -3,15 +3,15 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
-    "errors"
 
-	"go-chat/backend/internal/models"
 	"go-chat/backend/internal/auth"
+	"go-chat/backend/internal/models"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -21,43 +21,37 @@ type UserHandler struct {
 }
 
 func (h *UserHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.DB.Query(
-		context.Background(),
-		`
-		SELECT id, username, email, created_at
-		FROM users
-		ORDER BY id
-		`,
-	)
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if _, ok := auth.GetUserID(r.Context()); !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
+	rows, err := h.DB.Query(r.Context(), `SELECT id, username FROM users ORDER BY id`)
 	if err != nil {
 		http.Error(w, "Failed to fetch users", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
 
-	users := []models.User{}
-
+	users := []models.UserSummary{}
 	for rows.Next() {
-		var user models.User
-
-		err := rows.Scan(
-			&user.ID,
-			&user.Username,
-			&user.Email,
-			&user.CreatedAt,
-		)
-
-		if err != nil {
+		var user models.UserSummary
+		if err := rows.Scan(&user.ID, &user.Username); err != nil {
 			http.Error(w, "Failed to read user", http.StatusInternalServerError)
 			return
 		}
-
 		users = append(users, user)
 	}
-
+	if err := rows.Err(); err != nil {
+		http.Error(w, "Failed to read users", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
-
 	json.NewEncoder(w).Encode(users)
 }
 
