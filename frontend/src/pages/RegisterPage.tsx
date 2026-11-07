@@ -19,6 +19,26 @@ export default function RegisterPage() {
     event.preventDefault();
 
     setError("");
+    if (!username.trim()) {
+      setError("Username cannot be blank");
+      return;
+    }
+    if (Array.from(username).length > 50) {
+      setError("Username cannot exceed 50 characters");
+      return;
+    }
+    if (Array.from(email).length > 255) {
+      setError("Email cannot exceed 255 characters");
+      return;
+    }
+    if (Array.from(password).length < 8) {
+      setError("Password must contain at least 8 characters");
+      return;
+    }
+    if (new TextEncoder().encode(password).length > 72) {
+      setError("Password cannot exceed 72 bytes");
+      return;
+    }
     setLoading(true);
 
     try {
@@ -91,7 +111,7 @@ export default function RegisterPage() {
               minLength={8}
               required
             />
-            <p className="auth-hint" id="password-hint">Use at least 8 characters.</p>
+            <p className="auth-hint" id="password-hint">Password must be at least 8 characters long.</p>
           </div>
 
           {error && (

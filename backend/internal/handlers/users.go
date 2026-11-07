@@ -69,8 +69,8 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Username == "" || req.Email == "" || req.Password == "" {
-		http.Error(w, "Username, email and password are required", http.StatusBadRequest)
+	if err := validateRegistration(req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
