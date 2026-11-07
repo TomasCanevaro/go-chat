@@ -1,4 +1,5 @@
 import { handleResponse } from "./response";
+import { notifySessionExpired } from "./session";
 
 export async function apiRequest<T>(
   endpoint: string,
@@ -17,6 +18,8 @@ export async function apiRequest<T>(
     ...options,
     headers,
   });
+
+  if (response.status === 401) notifySessionExpired(token);
 
   return handleResponse<T>(response);
 }

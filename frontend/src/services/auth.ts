@@ -5,6 +5,7 @@ import type {
 } from "../types/auth";
 import type { User } from "../types/auth";
 import { handleResponse } from "./response";
+import { apiRequest } from "./api";
 
 export async function login(
   credentials: LoginRequest
@@ -35,11 +36,5 @@ export async function register(
 }
 
 export async function getCurrentUser(token: string): Promise<User> {
-  const response = await fetch("/api/me", {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  return handleResponse<User>(response);
+  return apiRequest<User>("/api/me", token);
 }

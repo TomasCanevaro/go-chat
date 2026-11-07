@@ -8,7 +8,7 @@ import "../styles/auth.css";
 export default function LoginPage() {
   const navigate = useNavigate();
 
-  const { login } = useAuth();
+  const { login, sessionMessage } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -43,6 +43,10 @@ export default function LoginPage() {
           <h1 id="login-title">Welcome back</h1>
           <p className="auth-description">Log in to continue your conversations.</p>
         </header>
+
+        {sessionMessage && (
+          <p className="auth-error auth-notice" role="status">{sessionMessage}</p>
+        )}
 
         <form className="auth-form" onSubmit={handleSubmit} aria-busy={loading}>
           <div className="auth-field">

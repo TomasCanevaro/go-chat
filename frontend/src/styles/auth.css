@@ -124,6 +124,10 @@
   overflow-wrap: anywhere;
 }
 
+.auth-notice {
+  margin-bottom: 20px;
+}
+
 .auth-footer {
   margin: 24px 0 0;
   text-align: center;

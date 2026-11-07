@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Message } from "../types/message";
+import { notifySessionExpired } from "../services/session";
 
 export type SocketStatus =
   | "disconnected"
@@ -39,6 +40,7 @@ export function useChatSocket({
 
   useEffect(() => {
     if (!token) return;
+    const sessionToken = token;
 
     const pendingMessages = pendingMessagesRef.current;
 
@@ -75,7 +77,7 @@ export function useChatSocket({
         socket.send(
           JSON.stringify({
             type: "auth",
-            token,
+            token: sessionToken,
           })
         );
       };
@@ -144,13 +146,21 @@ export function useChatSocket({
         }
       };
 
-      socket.onclose = () => {
+      socket.onclose = (event: CloseEvent) => {
         if (!active) return;
 
+        const wasAuthenticated = authenticatedRef.current;
         socketRef.current = null;
         authenticatedRef.current = false;
 
         rejectPendingMessages();
+        if (!wasAuthenticated && event.code === 1008) {
+          // Policy rejection during the JWT handshake is terminal for this token.
+          active = false;
+          setStatus("disconnected");
+          notifySessionExpired(sessionToken);
+          return;
+        }
         setStatus("disconnected");
 
         const delay = Math.min(

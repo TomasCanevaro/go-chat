@@ -5,6 +5,7 @@ export interface AuthContextType {
   user: User | null;
   token: string | null;
   loading: boolean;
+  sessionMessage: string;
   login: (credentials: LoginRequest) => Promise<void>;
   logout: () => void;
 }
