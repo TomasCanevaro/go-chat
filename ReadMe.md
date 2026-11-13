@@ -110,6 +110,15 @@ npm run lint
 npm run build
 ```
 
+Browser regression tests, also from `frontend/`:
+
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
+
+On Ubuntu / WSL, install any missing browser libraries with `npx playwright install-deps chromium` (requires administrator access). The suite starts and stops its own Vite server on port 5174 and mocks API/WebSocket responses; no Go server or PostgreSQL is needed, and no database data changes. To watch the tests, run `npm run test:e2e -- --headed`. An existing compatible Chromium can be selected with `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/path/to/chromium`. These frontend checks complement the backend integration tests below.
+
 Backend integration tests require a separate database named **`chatdb_test`**. Create it using the same role:
 
 ```bash
